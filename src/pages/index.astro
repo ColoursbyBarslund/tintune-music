@@ -1,17 +1,472 @@
 ---
-
 ---
 
 <html lang="en">
-	<head>
-		<meta charset="utf-8" />
-		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-		<link rel="icon" href="/favicon.ico" />
-		<meta name="viewport" content="width=device-width" />
-		<meta name="generator" content={Astro.generator} />
-		<title>Astro</title>
-	</head>
-	<body>
-		<h1>Astro</h1>
-	</body>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Tintune Music Lab</title>
+
+    <style>
+      :root {
+        --bg: #0b0b0b;
+        --panel: #121212;
+        --border: rgba(255, 255, 255, 0.12);
+        --text: rgba(255, 255, 255, 0.92);
+        --muted: rgba(255, 255, 255, 0.62);
+      }
+
+      body {
+        margin: 0;
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial,
+          "Apple Color Emoji", "Segoe UI Emoji";
+        background: var(--bg);
+        color: var(--text);
+      }
+
+      main {
+        max-width: 980px;
+        margin: 0 auto;
+        padding: 32px 20px 56px;
+      }
+
+      header {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        margin-bottom: 22px;
+      }
+
+      h1 {
+        margin: 0;
+        font-size: 28px;
+        letter-spacing: 0.2px;
+      }
+
+      p {
+        margin: 0;
+        color: var(--muted);
+        line-height: 1.35;
+      }
+
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        padding: 18px;
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 14px;
+      }
+
+      @media (min-width: 860px) {
+        .grid {
+          grid-template-columns: 1.1fr 0.9fr;
+          gap: 16px;
+        }
+      }
+
+      .paletteRow {
+        display: flex;
+        gap: 12px;
+        flex-wrap: wrap;
+        align-items: center;
+      }
+
+      .swatch {
+        display: grid;
+        gap: 8px;
+        width: 152px;
+      }
+
+      .swatch label {
+        font-size: 12px;
+        color: var(--muted);
+      }
+
+      .colorInput {
+        display: grid;
+        grid-template-columns: 44px 92px;
+        gap: 8px;
+        align-items: center;
+      }
+
+      input[type="color"] {
+        width: 44px;
+        height: 44px;
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 0;
+        background: transparent;
+      }
+
+      input[type="text"] {
+        height: 44px;
+        width: 92px;
+        justify-self: start;
+        border-radius: 10px;
+        border: 1px solid var(--border);
+        background: rgba(255, 255, 255, 0.06);
+        color: var(--text);
+        padding: 0 10px;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+        font-size: 13px;
+        letter-spacing: 0.2px;
+      }
+
+      .controls {
+        display: grid;
+        gap: 14px;
+        margin-top: 14px;
+      }
+
+      .slider {
+        display: grid;
+        gap: 8px;
+      }
+
+      .sliderHeader {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        align-items: baseline;
+      }
+
+      .sliderHeader span {
+        font-size: 13px;
+        color: var(--muted);
+      }
+
+      input[type="range"] {
+        width: 100%;
+      }
+
+      .actions {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin-top: 18px;
+        align-items: center;
+      }
+
+      button {
+        appearance: none;
+        border: 1px solid var(--border);
+        background: rgba(255, 255, 255, 0.08);
+        color: var(--text);
+        border-radius: 12px;
+        padding: 10px 14px;
+        font-size: 14px;
+        cursor: pointer;
+      }
+
+      button:hover {
+        background: rgba(255, 255, 255, 0.12);
+      }
+
+      button.primary {
+        background: rgba(255, 255, 255, 0.16);
+      }
+
+      .toggle {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        color: var(--muted);
+        font-size: 13px;
+        user-select: none;
+      }
+
+      .status {
+        margin-top: 10px;
+        font-size: 13px;
+        color: var(--muted);
+        min-height: 18px;
+      }
+
+      .hint {
+        font-size: 13px;
+        color: var(--muted);
+        line-height: 1.4;
+      }
+
+      .preview {
+        display: grid;
+        gap: 12px;
+      }
+
+      .bar {
+        height: 14px;
+        border-radius: 999px;
+        border: 1px solid var(--border);
+        overflow: hidden;
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr;
+      }
+
+      .bar > div {
+        height: 100%;
+      }
+
+      .mono {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+        font-size: 12px;
+        color: var(--muted);
+        line-height: 1.35;
+        word-break: break-word;
+      }
+
+      .divider {
+        height: 1px;
+        background: var(--border);
+        margin: 14px 0;
+      }
+    </style>
+  </head>
+
+  <body>
+    <main>
+      <header>
+        <h1>Tintune Music Lab</h1>
+        <p>A quick prototype: change colours and parameters, then generate a short music segment.</p>
+      </header>
+
+      <div class="grid">
+        <section class="panel">
+          <div class="paletteRow" aria-label="Palette">
+            <div class="swatch">
+              <label for="c1">Colour 1</label>
+              <div class="colorInput">
+                <input type="color" id="c1" value="#d0caa9" />
+                <input type="text" id="c1hex" value="#D0CAA9" inputmode="text" autocapitalize="characters" />
+              </div>
+            </div>
+
+            <div class="swatch">
+              <label for="c2">Colour 2</label>
+              <div class="colorInput">
+                <input type="color" id="c2" value="#37562a" />
+                <input type="text" id="c2hex" value="#37562A" inputmode="text" autocapitalize="characters" />
+              </div>
+            </div>
+
+            <div class="swatch">
+              <label for="c3">Colour 3</label>
+              <div class="colorInput">
+                <input type="color" id="c3" value="#7fac9d" />
+                <input type="text" id="c3hex" value="#7FAC9D" inputmode="text" autocapitalize="characters" />
+              </div>
+            </div>
+          </div>
+
+          <div class="controls" aria-label="Controls">
+            <div class="slider">
+              <div class="sliderHeader">
+                <strong>Energy</strong>
+                <span><span id="energyVal">40</span>/100</span>
+              </div>
+              <input type="range" id="energy" min="0" max="100" value="40" />
+            </div>
+
+            <div class="slider">
+              <div class="sliderHeader">
+                <strong>Texture</strong>
+                <span><span id="textureVal">50</span>/100</span>
+              </div>
+              <input type="range" id="texture" min="0" max="100" value="50" />
+            </div>
+
+            <div class="slider">
+              <div class="sliderHeader">
+                <strong>Space</strong>
+                <span><span id="spaceVal">60</span>/100</span>
+              </div>
+              <input type="range" id="space" min="0" max="100" value="60" />
+            </div>
+
+            <div class="actions">
+              <button class="primary" id="generate">Generate segment</button>
+              <button id="stop">Stop</button>
+              <label class="toggle">
+                <input type="checkbox" id="live" />
+                Live update
+              </label>
+            </div>
+
+            <div class="status" id="status"></div>
+          </div>
+        </section>
+
+        <aside class="panel preview">
+          <div>
+            <strong>Palette preview</strong>
+            <div class="divider"></div>
+            <div class="bar" aria-hidden="true">
+              <div id="p1"></div>
+              <div id="p2"></div>
+              <div id="p3"></div>
+            </div>
+          </div>
+
+          <div>
+            <strong>Payload</strong>
+            <div class="divider"></div>
+            <div class="mono" id="payload"></div>
+          </div>
+
+          <p class="hint">
+            Next step: we’ll add a server endpoint that calls ElevenLabs and returns a short audio segment.
+          </p>
+        </aside>
+      </div>
+
+      <script>
+        const $ = (id) => document.getElementById(id);
+
+        const state = {
+          palette: ["#D0CAA9", "#37562A", "#7FAC9D"],
+          energy: 40,
+          texture: 50,
+          space: 60,
+          live: false,
+        };
+
+        function normalizeHex(input) {
+          const raw = String(input || "").trim();
+          const hex = raw.startsWith("#") ? raw.slice(1) : raw;
+          if (hex.length === 3) {
+            const expanded = hex
+              .split("")
+              .map((c) => c + c)
+              .join("");
+            return "#" + expanded.toUpperCase();
+          }
+          if (hex.length !== 6) return null;
+          if (!/^[0-9a-fA-F]{6}$/.test(hex)) return null;
+          return "#" + hex.toUpperCase();
+        }
+
+        function setStatus(text) {
+          $("status").textContent = text || "";
+        }
+
+        function render() {
+          // sliders
+          $("energyVal").textContent = String(state.energy);
+          $("textureVal").textContent = String(state.texture);
+          $("spaceVal").textContent = String(state.space);
+
+          // palette preview
+          $("p1").style.background = state.palette[0];
+          $("p2").style.background = state.palette[1];
+          $("p3").style.background = state.palette[2];
+
+          // payload preview
+          const payload = {
+            palette: state.palette,
+            params: {
+              energy: state.energy,
+              texture: state.texture,
+              space: state.space,
+            },
+          };
+          $("payload").textContent = JSON.stringify(payload, null, 2);
+        }
+
+        function readFromUI() {
+          state.energy = Number($("energy").value);
+          state.texture = Number($("texture").value);
+          state.space = Number($("space").value);
+          state.live = $("live").checked;
+
+          const c1 = normalizeHex($("c1hex").value) || normalizeHex($("c1").value);
+          const c2 = normalizeHex($("c2hex").value) || normalizeHex($("c2").value);
+          const c3 = normalizeHex($("c3hex").value) || normalizeHex($("c3").value);
+
+          if (c1) state.palette[0] = c1;
+          if (c2) state.palette[1] = c2;
+          if (c3) state.palette[2] = c3;
+
+          // sync inputs back
+          $("c1").value = state.palette[0];
+          $("c2").value = state.palette[1];
+          $("c3").value = state.palette[2];
+
+          $("c1hex").value = state.palette[0];
+          $("c2hex").value = state.palette[1];
+          $("c3hex").value = state.palette[2];
+
+          render();
+        }
+
+        let liveTimer = null;
+        function scheduleLiveGenerate() {
+          if (!state.live) return;
+          if (liveTimer) window.clearTimeout(liveTimer);
+          liveTimer = window.setTimeout(() => {
+            liveTimer = null;
+            generateSegment();
+          }, 600);
+        }
+
+        function generateSegment() {
+          // placeholder for API call
+          readFromUI();
+          setStatus("Generating… (placeholder — API call comes next)");
+          console.log("Generate segment payload:", {
+            palette: state.palette,
+            energy: state.energy,
+            texture: state.texture,
+            space: state.space,
+          });
+          window.setTimeout(() => {
+            setStatus("Ready. Next: hook up ElevenLabs and play audio.");
+          }, 350);
+        }
+
+        function stopPlayback() {
+          setStatus("Stopped.");
+        }
+
+        // wire up UI
+        ["energy", "texture", "space"].forEach((id) => {
+          $(id).addEventListener("input", () => {
+            readFromUI();
+            scheduleLiveGenerate();
+          });
+        });
+
+        ["c1", "c2", "c3"].forEach((id, idx) => {
+          $(id).addEventListener("input", (e) => {
+            const v = normalizeHex(e.target.value);
+            if (v) state.palette[idx] = v;
+            readFromUI();
+            scheduleLiveGenerate();
+          });
+        });
+
+        ["c1hex", "c2hex", "c3hex"].forEach((id) => {
+          $(id).addEventListener("change", () => {
+            readFromUI();
+            scheduleLiveGenerate();
+          });
+        });
+
+        $("live").addEventListener("change", () => {
+          readFromUI();
+          setStatus(state.live ? "Live update enabled." : "Live update disabled.");
+        });
+
+        $("generate").addEventListener("click", generateSegment);
+        $("stop").addEventListener("click", stopPlayback);
+
+        // initial
+        readFromUI();
+        setStatus("Ready.");
+      </script>
+    </main>
+  </body>
 </html>
