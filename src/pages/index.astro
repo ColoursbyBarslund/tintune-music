@@ -297,6 +297,7 @@
             </div>
 
             <div class="status" id="status"></div>
+            <audio id="player" preload="auto"></audio>
           </div>
         </section>
 
@@ -412,22 +413,59 @@
           }, 600);
         }
 
-        function generateSegment() {
-          // placeholder for API call
+        let currentObjectUrl = null;
+
+        async function generateSegment() {
           readFromUI();
-          setStatus("Generating… (placeholder — API call comes next)");
-          console.log("Generate segment payload:", {
+          setStatus("Generating…");
+
+          const payload = {
             palette: state.palette,
-            energy: state.energy,
-            texture: state.texture,
-            space: state.space,
-          });
-          window.setTimeout(() => {
-            setStatus("Ready. Next: hook up ElevenLabs and play audio.");
-          }, 350);
+            params: {
+              energy: state.energy,
+              texture: state.texture,
+              space: state.space,
+            },
+          };
+
+          try {
+            const res = await fetch("/api/music", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(payload),
+            });
+
+            if (!res.ok) {
+              const t = await res.text().catch(() => "");
+              throw new Error(`API ${res.status}: ${t}`);
+            }
+
+            const blob = await res.blob();
+            const player = $("player");
+
+            if (currentObjectUrl) URL.revokeObjectURL(currentObjectUrl);
+            currentObjectUrl = URL.createObjectURL(blob);
+
+            player.src = currentObjectUrl;
+            await player.play();
+
+            setStatus("Playing.");
+          } catch (err) {
+            console.error(err);
+            setStatus(`Error: ${err?.message || err}`);
+          }
         }
 
         function stopPlayback() {
+          const player = $("player");
+          player.pause();
+          player.currentTime = 0;
+
+          if (currentObjectUrl) {
+            URL.revokeObjectURL(currentObjectUrl);
+            currentObjectUrl = null;
+          }
+
           setStatus("Stopped.");
         }
 
