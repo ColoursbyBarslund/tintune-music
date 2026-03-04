@@ -231,7 +231,7 @@
     <main>
       <header>
         <h1>Tintune Music Lab</h1>
-        <p>A quick prototype: change colours and parameters, then generate a short music segment.</p>
+        <p>Continuous music via Mubert streaming. Change colours and parameters, then start or update the stream.</p>
       </header>
 
       <div class="grid">
@@ -288,7 +288,7 @@
             </div>
 
             <div class="actions">
-              <button class="primary" id="generate">Generate segment</button>
+              <button class="primary" id="generate">Start / Update stream</button>
               <button id="stop">Stop</button>
               <label class="toggle">
                 <input type="checkbox" id="live" />
@@ -297,7 +297,7 @@
             </div>
 
             <div class="status" id="status"></div>
-            <audio id="player" preload="auto"></audio>
+            <audio id="player" preload="none" crossorigin="anonymous"></audio>
           </div>
         </section>
 
@@ -319,13 +319,27 @@
           </div>
 
           <p class="hint">
-            Next step: we’ll add a server endpoint that calls ElevenLabs and returns a short audio segment.
+            Stream is requested from <span class="mono">/api/mubert</span>. For now we use playlist_index <span class="mono">1.0.0</span>.
           </p>
         </aside>
       </div>
 
       <script>
         const $ = (id) => document.getElementById(id);
+
+        const LS_CUSTOM_ID_KEY = "tintune_music_custom_id";
+
+        function getOrCreateCustomId() {
+          try {
+            const existing = window.localStorage.getItem(LS_CUSTOM_ID_KEY);
+            if (existing) return existing;
+            const id = "tintune-music-" + Math.random().toString(16).slice(2) + "-" + Date.now().toString(16);
+            window.localStorage.setItem(LS_CUSTOM_ID_KEY, id);
+            return id;
+          } catch {
+            return "tintune-music-ephemeral";
+          }
+        }
 
         const state = {
           palette: ["#D0CAA9", "#37562A", "#7FAC9D"],
@@ -365,7 +379,6 @@
           $("p2").style.background = state.palette[1];
           $("p3").style.background = state.palette[2];
 
-          // payload preview
           const payload = {
             palette: state.palette,
             params: {
@@ -373,6 +386,8 @@
               texture: state.texture,
               space: state.space,
             },
+            playlist_index: "1.0.0",
+            custom_id: getOrCreateCustomId(),
           };
           $("payload").textContent = JSON.stringify(payload, null, 2);
         }
@@ -404,20 +419,10 @@
         }
 
         let liveTimer = null;
-        function scheduleLiveGenerate() {
-          if (!state.live) return;
-          if (liveTimer) window.clearTimeout(liveTimer);
-          liveTimer = window.setTimeout(() => {
-            liveTimer = null;
-            generateSegment();
-          }, 600);
-        }
 
-        let currentObjectUrl = null;
-
-        async function generateSegment() {
+        async function startMubertStream({ reason = "manual" } = {}) {
           readFromUI();
-          setStatus("Generating…");
+          setStatus(reason === "manual" ? "Starting stream…" : "Updating stream…");
 
           const payload = {
             palette: state.palette,
@@ -426,10 +431,12 @@
               texture: state.texture,
               space: state.space,
             },
+            playlist_index: "1.0.0",
+            custom_id: getOrCreateCustomId(),
           };
 
           try {
-            const res = await fetch("/api/music", {
+            const res = await fetch("/api/mubert", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify(payload),
@@ -440,13 +447,13 @@
               throw new Error(`API ${res.status}: ${t}`);
             }
 
-            const blob = await res.blob();
+            const json = await res.json();
+            const streamUrl = json?.streamUrl;
+            if (!streamUrl) throw new Error("Missing streamUrl from /api/mubert");
+
             const player = $("player");
-
-            if (currentObjectUrl) URL.revokeObjectURL(currentObjectUrl);
-            currentObjectUrl = URL.createObjectURL(blob);
-
-            player.src = currentObjectUrl;
+            player.crossOrigin = "anonymous";
+            player.src = streamUrl;
             await player.play();
 
             setStatus("Playing.");
@@ -456,24 +463,36 @@
           }
         }
 
-        function stopPlayback() {
-          const player = $("player");
-          player.pause();
-          player.currentTime = 0;
+        function scheduleLiveUpdate() {
+          if (!state.live) return;
+          if (liveTimer) window.clearTimeout(liveTimer);
+          liveTimer = window.setTimeout(() => {
+            liveTimer = null;
+            startMubertStream({ reason: "live" });
+          }, 700);
+        }
 
-          if (currentObjectUrl) {
-            URL.revokeObjectURL(currentObjectUrl);
-            currentObjectUrl = null;
+        function stopPlayback() {
+          if (liveTimer) {
+            window.clearTimeout(liveTimer);
+            liveTimer = null;
           }
+
+          const player = $("player");
+          try {
+            player.pause();
+            player.removeAttribute("src");
+            player.load();
+          } catch {}
 
           setStatus("Stopped.");
         }
 
-        // wire up UI
+        // --- wire up UI ---
         ["energy", "texture", "space"].forEach((id) => {
           $(id).addEventListener("input", () => {
             readFromUI();
-            scheduleLiveGenerate();
+            scheduleLiveUpdate();
           });
         });
 
@@ -482,14 +501,14 @@
             const v = normalizeHex(e.target.value);
             if (v) state.palette[idx] = v;
             readFromUI();
-            scheduleLiveGenerate();
+            scheduleLiveUpdate();
           });
         });
 
         ["c1hex", "c2hex", "c3hex"].forEach((id) => {
           $(id).addEventListener("change", () => {
             readFromUI();
-            scheduleLiveGenerate();
+            scheduleLiveUpdate();
           });
         });
 
@@ -498,7 +517,7 @@
           setStatus(state.live ? "Live update enabled." : "Live update disabled.");
         });
 
-        $("generate").addEventListener("click", generateSegment);
+        $("generate").addEventListener("click", () => startMubertStream({ reason: "manual" }));
         $("stop").addEventListener("click", stopPlayback);
 
         // initial
