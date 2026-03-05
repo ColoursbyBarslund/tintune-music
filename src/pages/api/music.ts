@@ -13,6 +13,12 @@ function clamp(n: number, min: number, max: number) {
   return Math.max(min, Math.min(max, n));
 }
 
+function resolveMusicLengthMs(raw: string | undefined): number {
+  const parsed = Number(raw ?? "");
+  if (!Number.isFinite(parsed)) return 180000;
+  return Math.round(clamp(parsed, 3000, 300000));
+}
+
 function buildPrompt(palette: string[], p: MusicRequest["params"]) {
   const energy = clamp(p.energy, 0, 100);
   const texture = clamp(p.texture, 0, 100);
@@ -37,6 +43,10 @@ function buildPrompt(palette: string[], p: MusicRequest["params"]) {
 
   return [
     "Instrumental music only.",
+    "Create a seamless loop designed to repeat forever.",
+    "No intro build-up, no outro, no ending cadence.",
+    "No fade-in and no fade-out.",
+    "The ending must connect seamlessly back to the beginning.",
     `Tempo around ${bpm} BPM.`,
     `Mood: ${mood}.`,
     `Texture: ${density}.`,
@@ -73,7 +83,9 @@ export const POST: APIRoute = async ({ request }) => {
   // Compose schema (prompt, music_length_ms, model_id, force_instrumental, output_format)  [oai_citation:2‡ElevenLabs](https://elevenlabs.io/docs/api-reference/music/compose?utm_source=chatgpt.com)
   const elevenUrl = "https://api.elevenlabs.io/v1/music/compose";
 
-  const musicLengthMs = 12000; // 12 sek segment (kan justeres)
+  const musicLengthMs = resolveMusicLengthMs(
+    import.meta.env.ELEVENLABS_MUSIC_LENGTH_MS || process.env.ELEVENLABS_MUSIC_LENGTH_MS
+  );
 
   const resp = await fetch(elevenUrl, {
     method: "POST",
