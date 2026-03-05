@@ -13,6 +13,21 @@ function clamp(n: number, min: number, max: number) {
   return Math.max(min, Math.min(max, n));
 }
 
+function sanitizeHeaderValue(value: string): string {
+  const trimmed = String(value ?? "").trim();
+  const cleaned = trimmed
+    .replace(/[\u201C\u201D\u2018\u2019]/g, "")
+    .replace(/^"+|"+$/g, "")
+    .replace(/\u00A0/g, " ")
+    .trim();
+  let out = "";
+  for (let i = 0; i < cleaned.length; i++) {
+    const code = cleaned.charCodeAt(i);
+    if (code <= 255) out += cleaned[i];
+  }
+  return out.trim();
+}
+
 function resolveMusicLengthMs(raw: string | undefined): number {
   const parsed = Number(raw ?? "");
   if (!Number.isFinite(parsed)) return 180000;
@@ -58,7 +73,7 @@ function buildPrompt(palette: string[], p: MusicRequest["params"]) {
 }
 
 export const POST: APIRoute = async ({ request }) => {
-  const apiKey = import.meta.env.ELEVENLABS_API_KEY || process.env.ELEVENLABS_API_KEY;
+  const apiKey = sanitizeHeaderValue(import.meta.env.ELEVENLABS_API_KEY || process.env.ELEVENLABS_API_KEY || "");
   if (!apiKey) {
     return new Response("Missing ELEVENLABS_API_KEY", { status: 500 });
   }
@@ -87,20 +102,26 @@ export const POST: APIRoute = async ({ request }) => {
     import.meta.env.ELEVENLABS_MUSIC_LENGTH_MS || process.env.ELEVENLABS_MUSIC_LENGTH_MS
   );
 
-  const resp = await fetch(elevenUrl, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "xi-api-key": apiKey,
-    },
-    body: JSON.stringify({
-      prompt,
-      music_length_ms: musicLengthMs,
-      model_id: "music_v1",
-      force_instrumental: true,
-      output_format: "mp3_44100_128",
-    }),
-  });
+  let resp: Response;
+  try {
+    resp = await fetch(elevenUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "xi-api-key": apiKey,
+      },
+      body: JSON.stringify({
+        prompt,
+        music_length_ms: musicLengthMs,
+        model_id: "music_v1",
+        force_instrumental: true,
+        output_format: "mp3_44100_128",
+      }),
+    });
+  } catch (err: any) {
+    const msg = err?.message || String(err);
+    return new Response(`ElevenLabs request failed: ${msg}`, { status: 502 });
+  }
 
   if (!resp.ok) {
     const text = await resp.text().catch(() => "");
