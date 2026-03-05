@@ -284,6 +284,9 @@
         background: transparent;
         transform: translate(-50%, -50%);
         cursor: grab;
+        touch-action: none;
+        user-select: none;
+        -webkit-user-select: none;
         box-shadow: none;
         z-index: 10;
       }
@@ -813,6 +816,13 @@
           popup: $("hexPopup"),
           popupInput: $("hexPopupInput"),
           dragIndex: -1,
+          dragPointerId: null,
+          dragPointerType: "",
+          dragMoved: false,
+          dragLongPressFired: false,
+          dragStartX: 0,
+          dragStartY: 0,
+          dragDotEl: null,
           editIndex: -1,
           hueSat: [
             { h: 0, s: 0 },
@@ -1688,19 +1698,102 @@
 
         // --- wire up UI ---
         function attachWheelInteractions() {
+          const LONG_PRESS_MS = 520;
+          const DOUBLE_TAP_MS = 320;
+          const TAP_MOVE_PX = 12;
+          const tapMeta = [
+            { lastTapAt: 0, x: 0, y: 0, longTimer: null },
+            { lastTapAt: 0, x: 0, y: 0, longTimer: null },
+            { lastTapAt: 0, x: 0, y: 0, longTimer: null },
+          ];
+
+          function clearLongTimer(idx) {
+            const t = tapMeta[idx]?.longTimer;
+            if (t) window.clearTimeout(t);
+            tapMeta[idx].longTimer = null;
+          }
+
+          function toggleRole(idx) {
+            state.enabled[idx] = !state.enabled[idx];
+            updateDotVisuals();
+            render();
+            scheduleLiveUpdate();
+          }
+
+          function beginDrag(idx, dot, e) {
+            hideHexPopup();
+            wheel.dragIndex = idx;
+            wheel.dragPointerId = e.pointerId;
+            wheel.dragMoved = false;
+            wheel.dragLongPressFired = false;
+            wheel.dragPointerType = e.pointerType || "";
+            wheel.dragStartX = e.clientX;
+            wheel.dragStartY = e.clientY;
+            wheel.dragDotEl = dot;
+            try {
+              dot.setPointerCapture(e.pointerId);
+            } catch {}
+          }
+
+          function finishDrag(e, { cancelled = false } = {}) {
+            if (wheel.dragIndex < 0) return;
+            if (wheel.dragPointerId != null && e && e.pointerId != null && e.pointerId !== wheel.dragPointerId) return;
+            const idx = wheel.dragIndex;
+            const moved = wheel.dragMoved;
+            const longFired = wheel.dragLongPressFired;
+            clearLongTimer(idx);
+            try {
+              wheel.dragDotEl?.releasePointerCapture?.(wheel.dragPointerId);
+            } catch {}
+            wheel.dragIndex = -1;
+            wheel.dragPointerId = null;
+            const pointerType = wheel.dragPointerType || "";
+            wheel.dragPointerType = "";
+            wheel.dragMoved = false;
+            wheel.dragLongPressFired = false;
+            wheel.dragDotEl = null;
+            if (cancelled) return;
+            if (moved) {
+              scheduleLiveUpdate();
+              return;
+            }
+            if (longFired) return;
+            if (pointerType === "mouse") return;
+            const now = Date.now();
+            const prev = tapMeta[idx];
+            const dt = now - prev.lastTapAt;
+            const dx = (e?.clientX ?? 0) - prev.x;
+            const dy = (e?.clientY ?? 0) - prev.y;
+            const dist = Math.hypot(dx, dy);
+            if (dt > 0 && dt <= DOUBLE_TAP_MS && dist <= TAP_MOVE_PX) {
+              toggleRole(idx);
+              prev.lastTapAt = 0;
+              return;
+            }
+            prev.lastTapAt = now;
+            prev.x = e?.clientX ?? 0;
+            prev.y = e?.clientY ?? 0;
+          }
+
           wheel.dots.forEach((dot, idx) => {
-            dot.addEventListener("mousedown", (e) => {
+            dot.addEventListener("pointerdown", (e) => {
+              if (e.pointerType === "mouse" && e.button !== 0) return;
               e.preventDefault();
-              hideHexPopup();
-              wheel.dragIndex = idx;
+              beginDrag(idx, dot, e);
+              clearLongTimer(idx);
+              if (e.pointerType !== "mouse") {
+                tapMeta[idx].longTimer = window.setTimeout(() => {
+                  if (wheel.dragIndex !== idx || wheel.dragMoved) return;
+                  wheel.dragLongPressFired = true;
+                  wheel.dragIndex = -1;
+                  openHexPopup(idx, wheel.dragStartX, wheel.dragStartY);
+                }, LONG_PRESS_MS);
+              }
             });
 
             dot.addEventListener("dblclick", (e) => {
               e.preventDefault();
-              state.enabled[idx] = !state.enabled[idx];
-              updateDotVisuals();
-              render();
-              scheduleLiveUpdate();
+              toggleRole(idx);
             });
 
             dot.addEventListener("contextmenu", (e) => {
@@ -1709,16 +1802,24 @@
             });
           });
 
-          window.addEventListener("mousemove", (e) => {
+          window.addEventListener("pointermove", (e) => {
             if (wheel.dragIndex < 0) return;
+            if (wheel.dragPointerId != null && e.pointerId !== wheel.dragPointerId) return;
+            const movedPx = Math.hypot(e.clientX - wheel.dragStartX, e.clientY - wheel.dragStartY);
+            if (movedPx > TAP_MOVE_PX) {
+              wheel.dragMoved = true;
+              clearLongTimer(wheel.dragIndex);
+            }
             const hs = pointerToHueSat(e.clientX, e.clientY);
             commitRoleColor(wheel.dragIndex, hs, { triggerUpdate: false });
           });
 
-          window.addEventListener("mouseup", () => {
-            if (wheel.dragIndex < 0) return;
-            wheel.dragIndex = -1;
-            scheduleLiveUpdate();
+          window.addEventListener("pointerup", (e) => {
+            finishDrag(e, { cancelled: false });
+          });
+
+          window.addEventListener("pointercancel", (e) => {
+            finishDrag(e, { cancelled: true });
           });
 
           wheel.popupInput.addEventListener("keydown", (e) => {
@@ -1740,7 +1841,7 @@
             }
           });
 
-          window.addEventListener("mousedown", (e) => {
+          window.addEventListener("pointerdown", (e) => {
             if (wheel.popup.style.display !== "block") return;
             if (wheel.popup.contains(e.target)) return;
             hideHexPopup();
