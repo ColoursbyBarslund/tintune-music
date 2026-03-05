@@ -3,6 +3,16 @@ export { renderers } from '../../renderers.mjs';
 function clamp(n, min, max) {
   return Math.max(min, Math.min(max, n));
 }
+function sanitizeHeaderValue(value) {
+  const trimmed = String(value).trim();
+  const cleaned = trimmed.replace(/[\u201C\u201D\u2018\u2019]/g, "").replace(/^"+|"+$/g, "").replace(/\u00A0/g, " ").trim();
+  let out = "";
+  for (let i = 0; i < cleaned.length; i++) {
+    const code = cleaned.charCodeAt(i);
+    if (code <= 255) out += cleaned[i];
+  }
+  return out.trim();
+}
 function resolveMusicLengthMs(raw) {
   const parsed = Number(raw);
   if (!Number.isFinite(parsed)) return 18e4;
@@ -32,7 +42,10 @@ function buildPrompt(palette, p) {
   ].join(" ");
 }
 const POST = async ({ request }) => {
-  const apiKey = "sk_9dab48d124f1c79acf1849092ace14a4489d034660e9b7c0";
+  const apiKey = sanitizeHeaderValue("sk_9dab48d124f1c79acf1849092ace14a4489d034660e9b7c0");
+  if (!apiKey) {
+    return new Response("Missing ELEVENLABS_API_KEY", { status: 500 });
+  }
   let body;
   try {
     body = await request.json();
@@ -49,20 +62,26 @@ const POST = async ({ request }) => {
   const musicLengthMs = resolveMusicLengthMs(
     "180000"
   );
-  const resp = await fetch(elevenUrl, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "xi-api-key": apiKey
-    },
-    body: JSON.stringify({
-      prompt,
-      music_length_ms: musicLengthMs,
-      model_id: "music_v1",
-      force_instrumental: true,
-      output_format: "mp3_44100_128"
-    })
-  });
+  let resp;
+  try {
+    resp = await fetch(elevenUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "xi-api-key": apiKey
+      },
+      body: JSON.stringify({
+        prompt,
+        music_length_ms: musicLengthMs,
+        model_id: "music_v1",
+        force_instrumental: true,
+        output_format: "mp3_44100_128"
+      })
+    });
+  } catch (err) {
+    const msg = err?.message || String(err);
+    return new Response(`ElevenLabs request failed: ${msg}`, { status: 502 });
+  }
   if (!resp.ok) {
     const text = await resp.text().catch(() => "");
     return new Response(

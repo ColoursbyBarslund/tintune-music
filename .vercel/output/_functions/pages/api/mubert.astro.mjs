@@ -397,7 +397,7 @@ const POST = async ({ request }) => {
     companyId = requireEnv("MUBERT_COMPANY_ID", "a13a4b83-2171-417c-a1bf-52f3787e1c75");
     licenseToken = requireEnv(
       "MUBERT_LICENSE_TOKEN",
-      "ZlLre0O9YytgrO7hmXvcQKpFKFRbvYptu2jCf5uKeIt9Tu1l1HYfftuHL7xlPXv0"
+      "SDa7qbvmp8TrZw2g3na5Eo5zxLfMNHxwVqmTELCSnVtuzFjv4ESrPPvYZvpiKl9b"
     );
   } catch (err) {
     return new Response(err?.message || String(err), { status: 500 });
